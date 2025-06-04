@@ -12,7 +12,7 @@
 \maketitle
 
 \section{Introduction}
-This document outlines the methodology used to compute MSA-level wage premia based on ACS data. The goal is to estimate the extent to which wages in different Metropolitan Statistical Areas (MSAs) differ after controlling for individual worker characteristics.
+This document outlines the methodology used to compute MSA-level wage premia based on ACS data. The goal is to estimate the extent to which wages in different Metropolitan Statistical Areas (MSAs) differ after controlling for individual worker characteristics and common year effects.
 
 \section{Data Source}
 The primary data source for this analysis is a Stata file (`extract19.dta`) containing pooled cross-sections from the American Community Survey (ACS) for the years 2005-2023. Key variables utilized from this dataset include:
@@ -41,32 +41,47 @@ Individuals with non-positive or non-finite hourly wages are excluded from the a
     \ln(w_i) = \log(\text{wage\_hr}_i)
 \end{equation}
 
-\subsection{Regression Model}
-For each year $t$ from 2005 to 2023, the following regression model is estimated using Ordinary Least Squares (OLS), weighted by \texttt{perwt}:
+\subsection{Pooled Regression Model}
+To estimate the wage premia, a pooled regression model is estimated across all years (2005-2023) using Ordinary Least Squares (OLS), weighted by \texttt{perwt}. The model specification is:
 \begin{equation}
-    \ln(w_{ijmt}) = \beta_0 + \beta_1 \text{age}_{it} + \beta_2 \text{age}_{it}^2 + \mathbf{X}_{it}'\gamma + \alpha_{mt} + \epsilon_{ijt}
-    \label{eq:main_regression}
+    \ln(w_{imt}) = \beta_1 \text{age}_{it} + \beta_2 \text{age}_{it}^2 + \mathbf{X}_{it}'\gamma + \delta_t + \theta_{mt} + \epsilon_{imt}
+    \label{eq:pooled_regression}
 \end{equation}
 where:
 \begin{itemize}
-    \item $w_{ijmt}$ is the hourly wage of individual $i$ in MSA $m$ in year $t$.
+    \item $w_{imt}$ is the hourly wage of individual $i$ in MSA $m$ in year $t$.
     \item $\text{age}_{it}$ and $\text{age}_{it}^2$ control for age in a quadratic form.
     \item $\mathbf{X}_{it}$ is a vector of dummy variables for individual characteristics: sex, race, and educational attainment. $\gamma$ is the corresponding vector of coefficients.
-    \item $\alpha_{mt}$ represents the fixed effect for MSA $m$ in year $t$. These are the key parameters of interest.
-    \item $\epsilon_{ijt}$ is the error term.
+    \item $\delta_t$ represents fixed effects for each year $t$. These absorb common time trends affecting all MSAs.
+    \item $\theta_{mt}$ represents interaction fixed effects for each unique MSA-year combination. These are the key parameters of interest, capturing MSA-specific deviations from the common year trends.
+    \item $\epsilon_{imt}$ is the error term.
 \end{itemize}
-The model is specified in `fixest::feols` syntax as:
+This model is implemented in R using the \texttt{fixest::feols} function. The formula is specified as:
+\begin{verbatim}
+lnw ~ age + I(age^2) + sex_fe + race_fe + educ_fe | 
+      year_fe + msa_year_interaction_fe
+\end{verbatim}
+Here, \texttt{sex\_fe}, \texttt{race\_fe}, and \texttt{educ\_fe} are factor variables for sex, race, and education, respectively. \texttt{year\_fe} corresponds to $\delta_t$. The crucial term \texttt{msa\_year\_interaction\_fe} corresponds to $\theta_{mt}$ and is constructed by creating a factor variable from the combined \texttt{met2013} and \texttt{year} identifiers (e.g., \texttt{factor(paste(met2013, year, sep = "\textunderscore"))}).
 
-\texttt{lnw \textasciitilde{} age + I(age	extasciicircum{}2) + factor(sex) + factor(race) + factor(educ) | met2013}
+\subsection{Wage Premia Estimation and Normalization}
+The estimated coefficients for \texttt{msa\_year\_interaction\_fe} (the $\hat{\theta}_{mt}$ values) are extracted from the \texttt{feols} model. To ensure accurate parsing of the coefficient names (which are in the format "MET2013\textunderscore YEAR"), the extraction is performed using \texttt{fixef(model\_pooled, names.as.factor = TRUE)}. These raw extracted values are denoted as \texttt{theta\_raw}.
 
-This effectively means that \texttt{met2013} (representing $\alpha_{mt}$) captures the average log-wage difference for MSA $m$ in year $t$ relative to a baseline MSA (omitted by the estimation procedure), after controlling for the specified individual characteristics.
-
-\subsection{Wage Premia}
-The estimated fixed effects, $\hat{\alpha}_{mt}$, are interpreted as the skill-adjusted log-wage premia for each MSA $m$ in year $t$. These are denoted as \texttt{fe\_adj\_lnw} in the output data. 
-
-These log-wage premia ($ \texttt{fe\_adj\_lnw}_{mt} $) represent the component of wages attributable to geographic location (MSA) after accounting for differences in the observable skill composition of the workforce across MSAs.
+To ensure comparability across MSAs and over time, these raw premia ($\hat{\theta}_{mt}$) are then normalized. This normalization involves selecting a reference MSA in a reference year. Specifically, the median MSA (based on the median value of $\hat{\theta}_{mt}$) in the median year of the data is chosen as the reference. The raw fixed effect value of this reference MSA-year combination ($\hat{\theta}_{m_{ref}, t_{ref}}$) is then subtracted from all other raw $\hat{\theta}_{mt}$ values:
+\begin{equation}
+    \text{theta\_normalized}_{mt} = \hat{\theta}_{mt} - \hat{\theta}_{m_{ref}, t_{ref}}
+\end{equation}
+This value, $\text{theta\_normalized}_{mt}$ (referred to as \texttt{theta\_normalized} in the output data files), is the final skill-adjusted log-wage premium for MSA $m$ in year $t$, relative to the chosen baseline. It represents the component of wages attributable to geographic location and its specific evolution over time, after accounting for worker characteristics and general year effects.
 
 \section{Output}
-The primary output containing these premia is \texttt{data/output/msa\_wage\_premia\_2005\_2023\_simplified.csv}. This file includes \texttt{met2013}, \texttt{year}, and \texttt{fe\_adj\_lnw}, among other variables.
+The initial output containing these pooled premia is \texttt{data/tidy/acs/acs\_pooled\_msa\_year\_premia.csv}. This file includes:
+\begin{itemize}
+    \item \texttt{met2013}: The MSA identifier.
+    \item \texttt{year}: The survey year.
+    \item \texttt{theta\_raw}: The raw MSA-year interaction fixed effect ($\hat{\theta}_{mt}$).
+    \item \texttt{theta\_normalized}: The normalized wage premium.
+    \item \texttt{se\_theta}: Placeholder for standard errors of the premia (currently NA).
+    \item \texttt{n\_observations}: The number of observations (sample size) in the ACS data for that specific MSA-year cell used in the regression.
+\end{itemize}
+This file is then further processed by merging it with Consumer Price Index (CPI) data in script \texttt{R/05\_deflate.R}, producing \texttt{data/output/msa\_wage\_premia\_pooled\_simplified\_cpi.csv}, which serves as the primary input for subsequent analysis and visualization scripts. The CPI adjustment is for informational purposes as the year fixed effects in the pooled model already account for national average inflation.
 
 \end{document} 
