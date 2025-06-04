@@ -1,0 +1,72 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{amsfonts} % For mathbb if needed later
+
+\title{Computation of MSA-Level Wage Premia}
+\author{Project Workflow Automation}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+This document outlines the methodology used to compute MSA-level wage premia based on ACS data. The goal is to estimate the extent to which wages in different Metropolitan Statistical Areas (MSAs) differ after controlling for individual worker characteristics.
+
+\section{Data Source}
+The primary data source for this analysis is a Stata file (`extract19.dta`) containing pooled cross-sections from the American Community Survey (ACS) for the years 2005-2023. Key variables utilized from this dataset include:
+\begin{itemize}
+    \item \texttt{incwage}: Individual's annual wage and salary income.
+    \item \texttt{wkswork1}: Weeks worked last year.
+    \item \texttt{uhrswork}: Usual hours worked per week.
+    \item \texttt{perwt}: Person weight.
+    \item \texttt{age}: Age of the individual.
+    \item \texttt{sex}: Sex of the individual.
+    \item \texttt{race}: Race of the individual.
+    \item \texttt{educ}: Educational attainment of the individual.
+    \item \texttt{met2013}: Metropolitan Statistical Area identifier (CBSA 2013 definition).
+    \item \texttt{year}: Survey year.
+\end{itemize}
+
+\section{Methodology}
+
+\subsection{Hourly Wage Calculation}
+First, an hourly wage is computed for each individual $i$ as:
+\begin{equation}
+    \text{wage\_hr}_i = \frac{\text{incwage}_i}{\text{wkswork1}_i \times \text{uhrswork}_i}
+\end{equation}
+Individuals with non-positive or non-finite hourly wages are excluded from the analysis. The natural logarithm of the hourly wage is then taken:
+\begin{equation}
+    \ln(w_i) = \log(\text{wage\_hr}_i)
+\end{equation}
+
+\subsection{Regression Model}
+For each year $t$ from 2005 to 2023, the following regression model is estimated using Ordinary Least Squares (OLS), weighted by \texttt{perwt}:
+\begin{equation}
+    \ln(w_{ijmt}) = \beta_0 + \beta_1 \text{age}_{it} + \beta_2 \text{age}_{it}^2 + \mathbf{X}_{it}'\gamma + \alpha_{mt} + \epsilon_{ijt}
+    \label{eq:main_regression}
+\end{equation}
+where:
+\begin{itemize}
+    \item $w_{ijmt}$ is the hourly wage of individual $i$ in MSA $m$ in year $t$.
+    \item $\text{age}_{it}$ and $\text{age}_{it}^2$ control for age in a quadratic form.
+    \item $\mathbf{X}_{it}$ is a vector of dummy variables for individual characteristics: sex, race, and educational attainment. $\gamma$ is the corresponding vector of coefficients.
+    \item $\alpha_{mt}$ represents the fixed effect for MSA $m$ in year $t$. These are the key parameters of interest.
+    \item $\epsilon_{ijt}$ is the error term.
+\end{itemize}
+The model is specified in `fixest::feols` syntax as:
+
+\texttt{lnw \textasciitilde{} age + I(age	extasciicircum{}2) + factor(sex) + factor(race) + factor(educ) | met2013}
+
+This effectively means that \texttt{met2013} (representing $\alpha_{mt}$) captures the average log-wage difference for MSA $m$ in year $t$ relative to a baseline MSA (omitted by the estimation procedure), after controlling for the specified individual characteristics.
+
+\subsection{Wage Premia}
+The estimated fixed effects, $\hat{\alpha}_{mt}$, are interpreted as the skill-adjusted log-wage premia for each MSA $m$ in year $t$. These are denoted as \texttt{fe\_adj\_lnw} in the output data. 
+
+These log-wage premia ($ \texttt{fe\_adj\_lnw}_{mt} $) represent the component of wages attributable to geographic location (MSA) after accounting for differences in the observable skill composition of the workforce across MSAs.
+
+\section{Output}
+The primary output containing these premia is \texttt{data/output/msa\_wage\_premia\_2005\_2023\_simplified.csv}. This file includes \texttt{met2013}, \texttt{year}, and \texttt{fe\_adj\_lnw}, among other variables.
+
+\end{document} 

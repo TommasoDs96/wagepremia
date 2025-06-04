@@ -1,0 +1,42 @@
+Analysis of MSA Log-Wage Premia for Year: 2023
+=======================================================
+
+Top 10 MSAs by Log-Wage Premium (Population shown in plots):
+    MSA_Code                                                MSA_Name
+      <char>                                                  <char>
+ 1:    41940           San Jose-Sunnyvale-Santa Clara, CA Metro Area
+ 2:    41860            San Francisco-Oakland-Fremont, CA Metro Area
+ 3:    42660                  Seattle-Tacoma-Bellevue, WA Metro Area
+ 4:    42220                      Santa Rosa-Petaluma, CA Metro Area
+ 5:    15680                California-Lexington Park, MD Metro Area
+ 6:    47900 Washington-Arlington-Alexandria, DC-VA-MD-WV Metro Area
+ 7:    46700                        Vallejo-Fairfield, CA Metro Area
+ 8:    14860              Bridgeport-Stamford-Norwalk, CT Metro Area
+ 9:    14460               Boston-Cambridge-Quincy, MA-NH Metro Area
+10:    34580                   Mount Vernon-Anacortes, WA Metro Area
+    Log_Wage_Premium
+               <num>
+ 1:         1.968704
+ 2:         1.891074
+ 3:         1.824408
+ 4:         1.795067
+ 5:         1.779092
+ 6:         1.763379
+ 7:         1.749749
+ 8:         1.749195
+ 9:         1.746408
+10:         1.743314
+
+Bottom 10 MSAs by Log-Wage Premium (Population shown in plots):
+    MSA_Code                                MSA_Name Log_Wage_Premium
+      <char>                                  <char>            <num>
+ 1:    25620              Hattiesburg, MS Metro Area         1.278100
+ 2:    27740             Johnson City, TN Metro Area         1.312927
+ 3:    11500          Anniston-Oxford, AL Metro Area         1.325819
+ 4:    44300            State College, PA Metro Area         1.341215
+ 5:    15180    Brownsville-Harlingen, TX Metro Area         1.349847
+ 6:    32580 McAllen-Edinburg-Mission, TX Metro Area         1.352380
+ 7:    29940                 Lawrence, KS Metro Area         1.352428
+ 8:    17780    College Station-Bryan, TX Metro Area         1.356480
+ 9:    27900                   Joplin, MO Metro Area         1.357144
+10:    13220                  Beckley, WV Micro Area         1.357210

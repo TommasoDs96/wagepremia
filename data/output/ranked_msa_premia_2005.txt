@@ -1,0 +1,42 @@
+Analysis of MSA Log-Wage Premia for Year: 2005
+=======================================================
+
+Top 10 MSAs by Log-Wage Premium (Population shown in plots):
+    MSA_Code                                                      MSA_Name
+      <char>                                                        <char>
+ 1:    41940                 San Jose-Sunnyvale-Santa Clara, CA Metro Area
+ 2:    14860                    Bridgeport-Stamford-Norwalk, CT Metro Area
+ 3:    41860                  San Francisco-Oakland-Fremont, CA Metro Area
+ 4:    46700                              Vallejo-Fairfield, CA Metro Area
+ 5:    47900       Washington-Arlington-Alexandria, DC-VA-MD-WV Metro Area
+ 6:    34900                                           Napa, CA Metro Area
+ 7:    45940                                  Trenton-Ewing, NJ Metro Area
+ 8:    35620 New York-Northern New Jersey-Long Island, NY-NJ-PA Metro Area
+ 9:    42100                         Santa Cruz-Watsonville, CA Metro Area
+10:    25540           Hartford-West Hartford-East Hartford, CT Metro Area
+    Log_Wage_Premium
+               <num>
+ 1:        1.1361039
+ 2:        1.1040467
+ 3:        1.0777060
+ 4:        1.0535413
+ 5:        1.0484357
+ 6:        1.0445010
+ 7:        1.0273789
+ 8:        1.0089510
+ 9:        1.0068210
+10:        0.9928925
+
+Bottom 10 MSAs by Log-Wage Premium (Population shown in plots):
+    MSA_Code                                MSA_Name Log_Wage_Premium
+      <char>                                  <char>            <num>
+ 1:    29740               Las Cruces, NM Metro Area        0.5546399
+ 2:    41660               San Angelo, TX Metro Area        0.5647707
+ 3:    29700                   Laredo, TX Metro Area        0.5806404
+ 4:    34060               Morgantown, WV Metro Area        0.5887733
+ 5:    25620              Hattiesburg, MS Metro Area        0.5964839
+ 6:    32580 McAllen-Edinburg-Mission, TX Metro Area        0.5987090
+ 7:    15180    Brownsville-Harlingen, TX Metro Area        0.6049259
+ 8:    17780    College Station-Bryan, TX Metro Area        0.6163943
+ 9:    21340                  El Paso, TX Metro Area        0.6199832
+10:    27900                   Joplin, MO Metro Area        0.6271657
