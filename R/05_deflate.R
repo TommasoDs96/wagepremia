@@ -13,48 +13,79 @@ if (!file.exists("data/CPI.csv")) {
 }
 cpi <- fread("data/CPI.csv")
 
-process_and_save_model_output <- function(model_type_suffix, cpi_data) {
-  cat(sprintf("Processing output for model type: %s\n", model_type_suffix))
-  
-  file_pattern <- sprintf("data/tidy/acs/msa_*_%s.csv", model_type_suffix)
-  files <- Sys.glob(file_pattern)
-  
-  if (length(files) == 0) {
-    warning(sprintf("No files found for pattern: %s. Skipping this model type.", file_pattern))
-    return(invisible(NULL))
-  }
-  
-  panel <- rbindlist(lapply(files, fread))
-  
-  if (nrow(panel) == 0) {
-    warning(sprintf("No data loaded for model type: %s after reading files. Skipping.", model_type_suffix))
-    return(invisible(NULL))
-  }
-  
-  # Ensure 'year' column exists for merging with CPI
-  if (!"year" %in% names(panel)) {
-    stop(sprintf("'year' column not found in the panel data for model type: %s", model_type_suffix))
-  }
+# Merges premia data with CPI data.
 
-  panel <- merge(panel, cpi_data, by = "year", all.x = TRUE)
-  
-  # V1 is the estimate from feols, raw_lnw is the raw log wage
-  panel[, `:=`(fe_adj_real = V1 / cpi, 
-                 raw_real = raw_lnw / cpi)]
-  setnames(panel, "V1", "fe_adj_lnw") # V1 contains the fixed effect estimate
-  
-  output_filename <- sprintf("data/output/msa_wage_premia_2005_2023_%s.csv", model_type_suffix)
-  fwrite(panel, output_filename)
-  cat(sprintf("Saved deflated data for %s model to: %s\n", model_type_suffix, output_filename))
-  invisible(TRUE)
+# Input file from the pooled regression (R/03_process_acs.R on feature/pooled-regression branch)
+pooled_premia_file <- "data/tidy/acs/acs_pooled_msa_year_premia.csv"
+
+# CPI data file (created manually or downloaded)
+cpi_file <- "data/CPI.csv" 
+
+# Output directory and file name
+output_dir <- "data/output/"
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+final_output_file <- file.path(output_dir, "msa_wage_premia_pooled_simplified_cpi.csv")
+
+# Loading data
+cat("--- Loading data ---\n")
+
+if (!file.exists(pooled_premia_file)) {
+  stop(paste("Pooled premia file not found:", pooled_premia_file, " - Please run R/03_process_acs.R on the correct branch."))
+}
+premia_data <- fread(pooled_premia_file)
+cat(sprintf("Loaded pooled premia data (from R/03). Rows: %d, Columns: %d\n", nrow(premia_data), ncol(premia_data)))
+cat("First few rows of loaded premia_data (input to R/05_deflate.R):\n")
+print(head(premia_data))
+cat("Structure of loaded premia_data (input to R/05_deflate.R):\n")
+str(premia_data)
+
+if (!file.exists(cpi_file)) {
+  stop(paste("CPI file not found:", cpi_file))
+}
+cpi_data <- fread(cpi_file)
+cat(sprintf("Loaded CPI data. Rows: %d, Columns: %d\n", nrow(cpi_data), ncol(cpi_data)))
+
+# Preparing and merging data
+cat("--- Preparing and merging data ---\n")
+
+# Ensure 'year' is integer in CPI data for merging
+cpi_data[, year := as.integer(year)]
+
+# Select relevant CPI column and rename for clarity if needed. Assume CPIAUCSL is the target series.
+# Let's keep all columns from CPI for now, or select specific ones.
+# cpi_to_merge <- cpi_data[, .(year, CPIAUCSL)] 
+
+# Merge premia data with CPI data
+# The premia_data already has 'year'.
+merged_data <- merge(premia_data, cpi_data, by = "year", all.x = TRUE)
+
+if (any(is.na(merged_data$CPIAUCSL))) {
+  warning("Warning: Some observations did not match CPI data for their year. CPI will be NA for these.")
+  print(merged_data[is.na(CPIAUCSL), .(year, n_missing_cpi = .N), by = year])
 }
 
-dir.create("data/output", recursive = TRUE, showWarnings = FALSE)
+cat(sprintf("Data merged. Rows in merged_data: %d\n", nrow(merged_data)))
 
-# Process for simplified model
-process_and_save_model_output(model_type_suffix = "simplified", cpi_data = cpi)
+# The 'theta_normalized' from the pooled model with year fixed effects already accounts for average national inflation.
+# No further "deflation" of theta_normalized by CPI is performed here as it would be redundant or misapplied.
+# CPI is included for informational purposes or for specific calculations like expressing premia in constant dollars of a base year.
 
-# Process for full model
-process_and_save_model_output(model_type_suffix = "full", cpi_data = cpi)
+# Saving final merged data
+cat("--- Saving final merged data ---\n")
 
-cat("All model types processed by 05_deflate.R.\n") 
+# Select and order columns for the final output
+# Keep all relevant columns from premia_data and the merged CPI columns
+# Standardizing column names for downstream use if needed (e.g. if other scripts expect 'fe_adj_lnw')
+# For now, we will use 'theta_normalized' as the primary premium measure.
+
+# Ensure met2013 is character
+merged_data[, met2013 := as.character(met2013)]
+
+# No RPP data to merge at this point.
+
+setcolorder(merged_data, c("met2013", "year", "theta_raw", "theta_normalized", "se_theta", "n_observations"))
+
+fwrite(merged_data, final_output_file)
+cat(paste("Final data with pooled premia and CPI saved to:", final_output_file, "\n"))
+
+cat("--- 05_deflate.R: Finished ---\n") 
