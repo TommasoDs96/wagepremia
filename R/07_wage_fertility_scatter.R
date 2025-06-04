@@ -4,7 +4,7 @@ source("R/00_packages.R") # Load common packages, ensure ggplot2, data.table, dp
 
 # --- 1. Define File Paths ---
 cat("--- Defining file paths ---\n")
-wage_premia_file <- "data/output/msa_wage_premia_2005_2023_simplified.csv"
+wage_premia_file <- "data/output/msa_wage_premia_pooled_simplified_cpi.csv"
 fertility_data_file <- "/Users/tommasodesanto/Desktop/Projects/Fertility/Codes/R/msa_panel_output/msa_panel_complete.csv"
 
 output_plot_dir <- "data/output"
@@ -29,10 +29,11 @@ cat("Fertility data loaded. Columns: ", paste(names(fertility_data), collapse=",
 cat("--- Preparing and merging data ---\n")
 
 # Select relevant columns and rename for clarity if needed
-# Wage data: met2013, year, fe_adj_real (real wage premium)
+# Wage data: met2013, year, theta_normalized (pooled log wage premium)
 setnames(wage_data, "met2013", "GEOID") # Rename to match fertility data for merging
 wage_data[, GEOID := as.character(GEOID)]
-wage_data <- wage_data[, .(GEOID, year, fe_adj_real, N)] # Keep N for potential weighting or filtering
+# Keep theta_normalized as the premium and n_observations for weighting
+wage_data <- wage_data[, .(GEOID, year, theta_normalized, n_observations)] # UPDATED
 
 # Fertility data: GEOID, year, birth_rate_per_1000, pct_households_with_children
 # Ensure GEOID is character in fertility data as well
@@ -50,10 +51,10 @@ if (nrow(merged_data) == 0) {
 # For a quick look, let's average by GEOID across years
 # Alternative: use latest common year, or plot all points faceted by year or colored by year
 plot_data_avg <- merged_data[, .(
-  avg_fe_adj_real = mean(fe_adj_real, na.rm = TRUE),
+  avg_theta_normalized = mean(theta_normalized, na.rm = TRUE), # UPDATED
   avg_birth_rate = mean(birth_rate_per_1000, na.rm = TRUE),
   avg_pct_hh_children = mean(pct_households_with_children, na.rm = TRUE),
-  total_N = sum(N, na.rm = TRUE) # Sum of N from wage data as a potential size indicator
+  total_n_observations = sum(n_observations, na.rm = TRUE) # UPDATED (sum of n_observations from wage data)
 ), by = GEOID]
 
 cat(sprintf("Averaged data for plotting has %d MSAs.\n", nrow(plot_data_avg)))
@@ -66,16 +67,16 @@ if (nrow(plot_data_avg) == 0) {
 cat("--- Creating scatterplots ---\n")
 
 # Plot 1: Wage Premia vs. Fertility Rate
-p1 <- ggplot(plot_data_avg, aes(x = avg_birth_rate, y = avg_fe_adj_real)) +
-  geom_point(aes(size = total_N), alpha = 0.6, na.rm = TRUE) +
+p1 <- ggplot(plot_data_avg, aes(x = avg_birth_rate, y = avg_theta_normalized)) + # UPDATED Y-axis
+  geom_point(aes(size = total_n_observations), alpha = 0.6, na.rm = TRUE) + # UPDATED size aesthetic
   geom_smooth(method = "lm", se = TRUE, color = "blue", na.rm = TRUE) +
-  scale_size_continuous(name = "Total Observations (all years)", labels = scales::comma) +
+  scale_size_continuous(name = "Total Observations (all years, ACS)", labels = scales::comma) + # UPDATED label
   labs(
-    title = "Wage Premia vs. Average Fertility Rate by MSA",
-    subtitle = "Values averaged across 2005-2023. Wage premia are inflation-adjusted.",
-    x = "Average Birth Rate per 1000 (2005-2023)",
-    y = "Average Real Wage Premium (fe_adj_real, 2005-2023)",
-    caption = "Source: ACS (Wage Premia) & User-provided Fertility Panel"
+    title = "Pooled Wage Premia (theta_normalized) vs. Average Fertility Rate by MSA", # UPDATED
+    subtitle = "Values averaged across available years. Wage premia from pooled ACS model.", # UPDATED
+    x = "Average Birth Rate per 1000", # Simplified
+    y = "Average Log Wage Premium (theta_normalized)", # UPDATED
+    caption = "Source: ACS (Wage Premia from Pooled Model) & User-provided Fertility Panel" # UPDATED
   ) +
   theme_minimal()
 
@@ -87,17 +88,17 @@ ggsave(
 cat("Saved scatter_wage_premia_vs_fertility_rate.png\n")
 
 # Plot 2: Wage Premia vs. Share of Households with Kids
-p2 <- ggplot(plot_data_avg, aes(x = avg_pct_hh_children, y = avg_fe_adj_real)) +
-  geom_point(aes(size = total_N), alpha = 0.6, na.rm = TRUE) +
+p2 <- ggplot(plot_data_avg, aes(x = avg_pct_hh_children, y = avg_theta_normalized)) + # UPDATED Y-axis
+  geom_point(aes(size = total_n_observations), alpha = 0.6, na.rm = TRUE) + # UPDATED size aesthetic
   geom_smooth(method = "lm", se = TRUE, color = "red", na.rm = TRUE) +
-  scale_size_continuous(name = "Total Observations (all years)", labels = scales::comma) +
+  scale_size_continuous(name = "Total Observations (all years, ACS)", labels = scales::comma) + # UPDATED label
   scale_x_continuous(labels = scales::percent_format(scale = 1)) + # Assuming pct_households_with_children is 0-100 scale
   labs(
-    title = "Wage Premia vs. Average Share of Households with Children by MSA",
-    subtitle = "Values averaged across 2005-2023. Wage premia are inflation-adjusted.",
-    x = "Average Pct. of Households with Children (2005-2023)",
-    y = "Average Real Wage Premium (fe_adj_real, 2005-2023)",
-    caption = "Source: ACS (Wage Premia) & User-provided Fertility Panel"
+    title = "Pooled Wage Premia (theta_normalized) vs. Avg. Share of Households with Children", # UPDATED
+    subtitle = "Values averaged across available years. Wage premia from pooled ACS model.", # UPDATED
+    x = "Average Pct. of Households with Children", # Simplified
+    y = "Average Log Wage Premium (theta_normalized)", # UPDATED
+    caption = "Source: ACS (Wage Premia from Pooled Model) & User-provided Fertility Panel" # UPDATED
   ) +
   theme_minimal()
 
@@ -119,12 +120,12 @@ for (yr in unique_years) {
   year_data <- merged_data[year == yr]
   
   # Ensure there's enough data and variance for regression, and N for weights
-  if (nrow(year_data) > 5 && any(!is.na(year_data$N) & year_data$N > 0)) {
+  if (nrow(year_data) > 5 && any(!is.na(year_data$n_observations) & year_data$n_observations > 0)) { # UPDATED weight check
     
     # Regression 1: Wage Premia vs. Fertility Rate
     if (sum(!is.na(year_data$birth_rate_per_1000)) > 2 && sd(year_data$birth_rate_per_1000, na.rm = TRUE) > 0) {
       model1_fit <- tryCatch({
-        lm(fe_adj_real ~ birth_rate_per_1000, data = year_data, weights = N)
+        lm(theta_normalized ~ birth_rate_per_1000, data = year_data, weights = n_observations) # UPDATED formula and weights
       }, error = function(e) NULL)
       
       if (!is.null(model1_fit)) {
@@ -143,7 +144,7 @@ for (yr in unique_years) {
     # Regression 2: Wage Premia vs. Share of Households with Kids
     if (sum(!is.na(year_data$pct_households_with_children)) > 2 && sd(year_data$pct_households_with_children, na.rm = TRUE) > 0) {
       model2_fit <- tryCatch({
-        lm(fe_adj_real ~ pct_households_with_children, data = year_data, weights = N)
+        lm(theta_normalized ~ pct_households_with_children, data = year_data, weights = n_observations) # UPDATED formula and weights
       }, error = function(e) NULL)
       
       if (!is.null(model2_fit)) {
@@ -174,8 +175,8 @@ if (length(yearly_coeffs_list) > 0) {
       geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, fill = "blue") +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
       labs(
-        title = "Coefficient of Birth Rate on Wage Premium Over Time",
-        subtitle = "Yearly cross-sectional weighted OLS (fe_adj_real ~ birth_rate_per_1000, weights=N)",
+        title = "Coefficient of Birth Rate on Pooled Wage Premium (theta_normalized) Over Time", # UPDATED
+        subtitle = "Yearly cross-sectional weighted OLS (theta_normalized ~ birth_rate_per_1000, weights=n_observations)", # UPDATED
         x = "Year",
         y = "Coefficient Estimate (Birth Rate per 1000)",
         caption = "Shaded area represents 95% confidence interval."
@@ -199,8 +200,8 @@ if (length(yearly_coeffs_list) > 0) {
       geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, fill = "red") +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
       labs(
-        title = "Coefficient of Pct. Households w/ Children on Wage Premium Over Time",
-        subtitle = "Yearly cross-sectional weighted OLS (fe_adj_real ~ pct_households_with_children, weights=N)",
+        title = "Coefficient of Pct. Households w/ Children on Pooled Wage Premium (theta_normalized) Over Time", # UPDATED
+        subtitle = "Yearly cross-sectional weighted OLS (theta_normalized ~ pct_households_with_children, weights=n_observations)", # UPDATED
         x = "Year",
         y = "Coefficient Estimate (Pct. Households w/ Children)",
         caption = "Shaded area represents 95% confidence interval."
